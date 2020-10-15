@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Space Invaders</title>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0px;
+            padding: 0px;
+        }
+
+        canvas {
+            background: #333;
+            border: 1px solid rgba(0,0,0,0.25);
+            border-bottom: 3px solid rgba(0,0,0,0.25);
+            border-radius: 3px;
+            box-shadow: 0px 3px 20px rgba(0,0,0,0.25);
+            animatiom: canvas 1s;
+        }
+
+        @keyframes canvas {
+            from{transform: scale(0);}
+            to{transform: scale(1);}
+        }
+
+        img {
+            display: none;
+        }
+
+        #canvas-container {
+            position: relative;
+        }
+        
+        button {
+            font-family: "Arial";
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.25);
+            border-bottom: 3px solid rgba(0,0,0,0.25);
+            border-radius: 3px;
+            padding: 5px 10px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.75);
+        }
+
+        button#btn-pause {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <img src="sprite.png" id="sprite">
+    <div id="canvas-container">
+        <canvas id="canvas" width="800" height="480"></canvas>
+        <!--<button id="btn-pause">PAUSE</button>-->
+    </div>
+    <script src="enemy.js"></script>
+    <script src="bullet.js"></script>
+    <script>
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+        var sprite = document.getElementById('sprite');
+
+        var x = 15;
+        var y = 445;
+
+        var speed = 10;
+
+        var minX = 10;
+        var maxX = 755;
+
+        var moveLeft = false;
+        var moveRight = false;
+
+        var enemies = [];
+        var enemyUpdate = 0;
+
+        var bullets = [];
+        var bulletUpdate = 0;
+
+        var playerArea = {
+            x: 0,
+            y: 425,
+            w: 800,
+            h: 55,
+            isCollide: function(obj) {
+                return (
+                    (
+                        //corner top-right obj collide w/ corner top-left this
+                        obj.x + obj.w > this.x &&
+                        //corner bottom-left obj collide w/ corner top-left this
+                        obj.y + obj.h > this.y &&
+                        //corner top-right obj collide w/ corner top-right this
+                        obj.x + obj.w < this.x + this.w &&
+                        //corner bottom-left obj collide w/ corner bottom-left this
+                        obj.y + obj.h < this.y + this.h
+                    ) ||
+                    (
+                        //corner top-left obj collide w/ corner top-left this
+                        obj.x  > this.x &&
+                        //corner bottom-left obj collide w/ corner top-left this
+                        obj.y + obj.h > this.y &&
+                        //corner top-left obj collide w/ corner top-right this
+                        obj.x  < this.x + this.h &&
+                        //corner bottom-left obj collide w/ corner bottom-left this
+                        obj.y + obj.h < this.y + this.h
+                    ) ||
+                    (
+                        //corner top-left obj collide w/ corner top-left this
+                        obj.x > this.x &&
+                        //corner top-left obj collide w/ corner top-left this
+                        obj.y > this.y &&
+                        //corner top-left obj collide w/ corner top-right this
+                        obj.x < this.x + this.w &&
+                        //corner top-left obj collide w/ corner top-right this
+                        obj.y < this.y + this.h
+                    ) ||
+                    (
+                        //corner top-right obj collide w/ corner top-left this
+                        obj.x + obj.w > this.x &&
+                        //corner top-left obj collide w/ corner top-left this
+                        obj.y > this.y &&
+                        //corner top-right obj collide w/ corner top-right this
+                        obj.x + obj.w < this.x + this.w &&
+                        //corner top-left obj collide w/ corner top-right this
+                        obj.y < this.y + this.h
+                    )
+                );
+            }
+        }
+
+        var score = 0;
+
+        var isGameOver = false;
+
+        window.onload = function () {
+            setupEnemy();
+            update();
+        }
+
+        function setupEnemy() {
+            for(let i = 0; i < 5; i++){
+                for(let j = 0; j < 11; j++){
+                    enemies.push(new Enemy(j * 40 + 15, i * 30 + +30 + 15));
+                }
+            }
+        }
+
+        function update() {
+            if(moveLeft) { x -= speed }
+            if(moveRight) { x += speed }
+
+            if(x < minX) x = minX;
+            if(x > maxX) x = maxX;
+
+            enemyUpdate++;
+            if(enemyUpdate === 10){
+                enemies.forEach(function (enemy) {
+                    enemy.update();
+                    if(playerArea.isCollide(enemy)){
+                        isGameOver = true;
+                    }
+                });
+                enemyUpdate = 0;
+            }
+
+            bullets.forEach(function (bullet, index) {
+                if(bullet.isOutOfBounds()){
+                    bullets.splice(index, 1);
+                }else{
+                    bullet.update();
+                    enemies.forEach(function (enemy, eIndex) {
+                        if(enemy.isCollide(bullet)){
+                            score += 10;
+                            bullets.splice(index, 1);
+                            enemies.splice(eIndex, 1);
+                        }
+                    })
+                }
+            });
+
+            draw();
+        }
+
+        function draw(){
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBar();
+            drawArea();
+            drawPlayer();
+
+            enemies.forEach(function (enemy) {
+                enemy.draw(ctx);
+            });
+
+            bullets.forEach(function (bullet) {
+                bullet.draw(ctx);
+            });
+
+            if(!isGameOver) {
+                window.requestAnimationFrame(update);
+            }
+        }
+
+        function drawPlayer(){
+            // ctx.fillStyle = "green";
+            // ctx.fillRect(x, y, 50, 50);
+            ctx.drawImage(sprite, 400, 14, 73, 52, x, y, 35, 25);
+        }
+
+        function drawArea() {
+            ctx.fillStyle = "#444";
+            ctx.fillRect(playerArea.x, playerArea.y, playerArea.w, playerArea.h );
+        }
+
+        function drawBar() {
+            // ctx.fillStyle = "#444";
+            // ctx.fillRect(0, 0, 800, 30);
+            ctx.font = "18px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText('Score : ' + score, 14, 25);
+        }
+
+        document.onkeydown = function(e) {
+            if(e.keyCode === 65) { moveLeft = true; }
+            if(e.keyCode === 68) { moveRight = true; }
+            if(e.keyCode === 13) {
+                bullets.push(new Bullet(x + 17, y));
+            }
+
+        }
+
+        document.onkeyup = function (e) {
+            if(e.keyCode === 65) { moveLeft = false; }
+            if(e.keyCode === 68) { moveRight = false; }
+            if(e.keyCode === 32) {
+                bullets.push(new Bullet(x + 17, y));
+            }
+        }
+    </script>
+
+</body>
+</html>
